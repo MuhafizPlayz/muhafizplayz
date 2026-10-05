@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Site URL: https://muhafizplayz.github.io/muhafizplayz (change it if you add a custom domain).
-     Add one <url> block for every new drama page. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/</loc></url>
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/about.html</loc></url>
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/contact.html</loc></url>
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/privacy-policy.html</loc></url>
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/terms.html</loc></url>
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/pages/drama.html?id=gunesin-dogdugu-yer</loc></url>
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/pages/drama.html?id=haysiyet</loc></url>
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/pages/drama.html?id=anne-yarisi</loc></url>
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/pages/drama.html?id=bir-gece-masali</loc></url>
-  <url><loc>https://muhafizplayz.github.io/muhafizplayz/pages/drama.html?id=sultan-mehmet-faith</loc></url>
+  <url>
+    <loc>https://muhafizplayz.github.io/muhafizplayz/</loc>
+  </url>
+  <url>
+    <loc>https://muhafizplayz.github.io/muhafizplayz/about.html</loc>
+  </url>
+  <url>
+    <loc>https://muhafizplayz.github.io/muhafizplayz/contact.html</loc>
+  </url>
+  <url>
+    <loc>https://muhafizplayz.github.io/muhafizplayz/privacy-policy.html</loc>
+  </url>
+  <url>
+    <loc>https://muhafizplayz.github.io/muhafizplayz/terms.html</loc>
+  </url>
 </urlset>
