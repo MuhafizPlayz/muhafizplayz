@@ -1,10 +1,243 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Episodes | Muhafız Playz</title><style>body{margin:0;background:#0e0e0f;color:#fff;font-family:Arial,sans-serif}.wrap{width:min(1100px,calc(100% - 30px));margin:auto;padding:25px 0 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:25px}.top a,.top button,.btn{padding:10px 14px;border:0;border-radius:8px;text-decoration:none;cursor:pointer}.panel{background:#171719;border:1px solid #29292c;border-radius:14px;padding:20px;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}input,textarea,select{width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #333;background:#101011;color:#fff;margin:6px 0 12px}label{display:block;color:#bbb;margin-top:8px}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #29292c;text-align:left}button.danger{background:#7a2020;color:#fff}.msg{color:#aaa;margin:8px 0}.hide{display:none}</style></head><body>
-<div class="wrap"><div class="top"><h1>Episodes</h1><div><a href="index.html">Dashboard</a> <button onclick="logoutUser()">Logout</button></div></div><div class="panel"><form id="form"><input type="hidden" id="id"><label>Drama</label><select id="drama_id" required></select><label>Episode Number</label><input id="episode_number" type="number" min="1" required><label>Title</label><input id="title"><label>Thumbnail URL</label><input id="thumbnail_url"><label>Description</label><textarea id="description"></textarea><label>Release Date</label><input id="release_date" type="date"><label>Server 1 URL</label><input id="server1_url"><label>480p Download URL</label><input id="download_480_url"><label>720p Download URL</label><input id="download_720_url"><label>1080p Download URL</label><input id="download_1080_url"><label><input id="published" type="checkbox"> Published</label><button class="btn" type="submit">Save Episode</button><button class="btn" type="button" onclick="resetForm()">New</button><div class="msg" id="msg"></div></form></div><div class="panel"><div id="list">Loading...</div></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="../js/config.js"></script><script src="../js/auth.js"></script><script>let editId=null;
-async function loadDramas(){let {data,error}=await supabaseClient.from("dramas").select("id,title").order("title");if(error){msg.textContent=error.message;return}drama_id.innerHTML=(data||[]).map(d=>`<option value="${d.id}">${d.title}</option>`).join("")}
-function resetForm(){editId=null;form.reset();id.value=""}
-async function load(){let r=await checkAdmin();if(!r.isAdmin){location.href="../login.html";return}await loadDramas();let {data,error}=await supabaseClient.from("episodes").select("*,dramas(title)").order("created_at",{ascending:false});if(error){list.textContent=error.message;return}list.innerHTML=`<table><tr><th>Drama</th><th>Episode</th><th>Published</th><th>Action</th></tr>${(data||[]).map(e=>`<tr><td>${e.dramas?.title||""}</td><td>${e.episode_number}</td><td>${e.published?"Yes":"No"}</td><td><button onclick='edit(${JSON.stringify(e)})'>Edit</button> <button class="danger" onclick="del('${e.id}')">Delete</button></td></tr>`).join("")}</table>`}
-function edit(e){editId=e.id;for(const k of ["drama_id","episode_number","title","thumbnail_url","description","release_date","server1_url","download_480_url","download_720_url","download_1080_url"])document.getElementById(k).value=e[k]??"";published.checked=!!e.published;scrollTo(0,0)}
-async function del(id){if(!confirm("Delete this episode?"))return;let {error}=await supabaseClient.from("episodes").delete().eq("id",id);if(error)alert(error.message);else load()}
-form.onsubmit=async e=>{e.preventDefault();let obj={drama_id:drama_id.value,episode_number:Number(episode_number.value),title:title.value.trim()||null,thumbnail_url:thumbnail_url.value.trim()||null,description:description.value.trim()||null,release_date:release_date.value||null,server1_url:server1_url.value.trim()||null,download_480_url:download_480_url.value.trim()||null,download_720_url:download_720_url.value.trim()||null,download_1080_url:download_1080_url.value.trim()||null,published:published.checked};let q=editId?supabaseClient.from("episodes").update(obj).eq("id",editId):supabaseClient.from("episodes").insert(obj);let {error}=await q;if(error)msg.textContent=error.message;else{msg.textContent="Saved.";resetForm();load()}}
-load();</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Episodes | Muhafız Playz Admin</title>
+<link rel="stylesheet" href="admin.css?v=20261006">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Episodes</h1>
+        <p class="sub" id="count">Loading...</p>
+      </div>
+      <button class="btn primary" id="newBtn" type="button">+ Add Episode</button>
+    </div>
+
+    <div class="card hide" id="formCard">
+      <h2 id="formTitle">Add Episode</h2>
+      <form id="form">
+        <div class="form-grid">
+          <div>
+            <label class="l" for="drama_id">Drama</label>
+            <select id="drama_id" required></select>
+          </div>
+          <div>
+            <label class="l" for="episode_number">Episode Number</label>
+            <input type="number" id="episode_number" min="1" required>
+          </div>
+          <div>
+            <label class="l" for="title">Title</label>
+            <input type="text" id="title">
+          </div>
+          <div>
+            <label class="l" for="release_date">Release Date</label>
+            <input type="date" id="release_date">
+          </div>
+          <div class="full">
+            <label class="l" for="thumbnail_url">Thumbnail URL</label>
+            <input type="text" id="thumbnail_url" placeholder="https://...">
+          </div>
+          <div class="full">
+            <label class="l" for="description">Description</label>
+            <textarea id="description"></textarea>
+          </div>
+          <div class="full">
+            <label class="l" for="server1_url">Server 1 URL</label>
+            <input type="text" id="server1_url">
+          </div>
+          <div>
+            <label class="l" for="download_480_url">480p Download URL</label>
+            <input type="text" id="download_480_url">
+          </div>
+          <div>
+            <label class="l" for="download_720_url">720p Download URL</label>
+            <input type="text" id="download_720_url">
+          </div>
+          <div>
+            <label class="l" for="download_1080_url">1080p Download URL</label>
+            <input type="text" id="download_1080_url">
+          </div>
+        </div>
+
+        <div class="checks">
+          <label><input type="checkbox" id="published"> Published</label>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn primary" type="submit" id="saveBtn">Save Episode</button>
+          <button class="btn" type="button" id="cancelBtn">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Search drama or episode...">
+        <select id="filterDrama"><option value="">All dramas</option></select>
+      </div>
+      <div class="table-wrap" id="list">Loading...</div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js?v=20261006"></script>
+<script src="../js/auth.js?v=20261006"></script>
+<script src="admin.js?v=20261006"></script>
+<script>
+var editId = null;
+var eps = [];
+var FIELDS = ["drama_id", "episode_number", "title", "thumbnail_url", "description", "release_date", "server1_url", "download_480_url", "download_720_url", "download_1080_url"];
+
+function $(id) { return document.getElementById(id); }
+
+function openForm(ep) {
+  editId = ep ? ep.id : null;
+  $("formTitle").textContent = ep ? "Edit Episode" : "Add Episode";
+  $("form").reset();
+  if (ep) {
+    FIELDS.forEach(function (k) { $(k).value = ep[k] == null ? "" : ep[k]; });
+    $("published").checked = !!ep.published;
+  } else if ($("filterDrama").value) {
+    $("drama_id").value = $("filterDrama").value;
+  }
+  $("formCard").classList.remove("hide");
+  $("episode_number").focus();
+  window.scrollTo(0, 0);
+}
+
+function closeForm() {
+  editId = null;
+  $("form").reset();
+  $("formCard").classList.add("hide");
+}
+
+function render() {
+  var term = $("search").value.trim().toLowerCase();
+  var drama = $("filterDrama").value;
+
+  var rows = eps.filter(function (e) {
+    if (drama && String(e.drama_id) !== drama) return false;
+    if (term) {
+      var hay = ((e.dramas && e.dramas.title) || "") + " " + (e.title || "") + " " + e.episode_number;
+      if (hay.toLowerCase().indexOf(term) === -1) return false;
+    }
+    return true;
+  });
+
+  $("count").textContent = eps.length + " total, showing " + rows.length;
+
+  var box = $("list");
+  if (!rows.length) {
+    box.innerHTML = '<div class="empty-state">No episodes found.</div>';
+    return;
+  }
+
+  box.innerHTML = "<table><tr><th>Drama</th><th>Episode</th><th>Links</th><th>Status</th><th>Actions</th></tr>" +
+    rows.map(function (e) {
+      var links = (e.server1_url ? '<span class="badge blue">Stream</span> ' : "") +
+        (e.download_480_url ? '<span class="badge gray">480p</span> ' : "") +
+        (e.download_720_url ? '<span class="badge gray">720p</span> ' : "") +
+        (e.download_1080_url ? '<span class="badge gray">1080p</span>' : "");
+      var id = esc(e.id);
+      return "<tr><td class=\"t-title\">" + esc((e.dramas && e.dramas.title) || "-") + "</td>" +
+        "<td><div class=\"t-title\">Episode " + esc(e.episode_number) + "</div><div class=\"t-sub\">" + esc(e.title || "") + "</div></td>" +
+        "<td>" + (links || '<span class="t-sub">No links</span>') + "</td>" +
+        "<td>" + (e.published ? '<span class="badge green">Published</span>' : '<span class="badge gray">Draft</span>') + "</td>" +
+        "<td><div class=\"actions\">" +
+        "<button class=\"btn sm\" data-act=\"edit\" data-id=\"" + id + "\">Edit</button>" +
+        "<button class=\"btn sm\" data-act=\"toggle\" data-id=\"" + id + "\">" + (e.published ? "Unpublish" : "Publish") + "</button>" +
+        "<button class=\"btn sm danger\" data-act=\"del\" data-id=\"" + id + "\">Delete</button>" +
+        "</div></td></tr>";
+    }).join("") + "</table>";
+}
+
+async function loadDramas() {
+  var res = await supabaseClient.from("dramas").select("id,title").order("title");
+  if (res.error) { toast(res.error.message, "err"); return; }
+  var opts = (res.data || []).map(function (d) { return '<option value="' + esc(d.id) + '">' + esc(d.title) + "</option>"; }).join("");
+  $("drama_id").innerHTML = opts;
+  $("filterDrama").innerHTML = '<option value="">All dramas</option>' + opts;
+}
+
+async function load() {
+  var res = await supabaseClient.from("episodes").select("*,dramas(title)").order("created_at", { ascending: false });
+  if (res.error) {
+    $("list").innerHTML = '<div class="empty-state">' + esc(res.error.message) + "</div>";
+    $("count").textContent = "Error";
+    return;
+  }
+  eps = res.data || [];
+  render();
+}
+
+$("list").addEventListener("click", async function (e) {
+  var btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  var ep = eps.find(function (x) { return String(x.id) === btn.dataset.id; });
+  if (!ep) return;
+
+  if (btn.dataset.act === "edit") {
+    openForm(ep);
+  } else if (btn.dataset.act === "toggle") {
+    var r = await supabaseClient.from("episodes").update({ published: !ep.published }).eq("id", ep.id);
+    if (r.error) toast(r.error.message, "err");
+    else { toast(ep.published ? "Episode unpublished." : "Episode published."); load(); }
+  } else if (btn.dataset.act === "del") {
+    if (!confirm("Delete Episode " + ep.episode_number + "? This cannot be undone.")) return;
+    var r2 = await supabaseClient.from("episodes").delete().eq("id", ep.id);
+    if (r2.error) toast(r2.error.message, "err");
+    else { toast("Episode deleted."); load(); }
+  }
+});
+
+$("newBtn").addEventListener("click", function () { openForm(null); });
+$("cancelBtn").addEventListener("click", closeForm);
+$("search").addEventListener("input", render);
+$("filterDrama").addEventListener("change", render);
+
+$("form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  var obj = {
+    drama_id: $("drama_id").value,
+    episode_number: Number($("episode_number").value),
+    title: $("title").value.trim() || null,
+    thumbnail_url: $("thumbnail_url").value.trim() || null,
+    description: $("description").value.trim() || null,
+    release_date: $("release_date").value || null,
+    server1_url: $("server1_url").value.trim() || null,
+    download_480_url: $("download_480_url").value.trim() || null,
+    download_720_url: $("download_720_url").value.trim() || null,
+    download_1080_url: $("download_1080_url").value.trim() || null,
+    published: $("published").checked
+  };
+  if (!obj.drama_id || !obj.episode_number) { toast("Drama and episode number are required.", "err"); return; }
+
+  $("saveBtn").disabled = true;
+  var q = editId
+    ? supabaseClient.from("episodes").update(obj).eq("id", editId)
+    : supabaseClient.from("episodes").insert(obj);
+  var r = await q;
+  $("saveBtn").disabled = false;
+
+  if (r.error) { toast(r.error.message, "err"); return; }
+  toast("Episode saved.");
+  closeForm();
+  load();
+});
+
+(async function () {
+  var ok = await requireAdmin();
+  if (!ok) return;
+  renderNav("episodes");
+  await loadDramas();
+  load();
+})();
+</script>
+</body>
+</html>
