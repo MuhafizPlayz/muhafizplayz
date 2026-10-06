@@ -1,7 +1,169 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Categories | Muhafız Playz</title><style>body{margin:0;background:#0e0e0f;color:#fff;font-family:Arial,sans-serif}.wrap{width:min(1100px,calc(100% - 30px));margin:auto;padding:25px 0 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:25px}.top a,.top button,.btn{padding:10px 14px;border:0;border-radius:8px;text-decoration:none;cursor:pointer}.panel{background:#171719;border:1px solid #29292c;border-radius:14px;padding:20px;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}input,textarea,select{width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #333;background:#101011;color:#fff;margin:6px 0 12px}label{display:block;color:#bbb;margin-top:8px}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #29292c;text-align:left}button.danger{background:#7a2020;color:#fff}.msg{color:#aaa;margin:8px 0}.hide{display:none}</style></head><body>
-<div class="wrap"><div class="top"><h1>Categories</h1><div><a href="index.html">Dashboard</a> <button onclick="logoutUser()">Logout</button></div></div><div class="panel"><form id="form"><input type="hidden" id="id"><label>Name</label><input id="name" required><label>Slug</label><input id="slug" required><label>Sort Order</label><input id="sort_order" type="number" value="10"><button class="btn" type="submit">Save Category</button><button class="btn" type="button" onclick="resetForm()">New</button><div id="msg" class="msg"></div></form></div><div class="panel"><div id="list">Loading...</div></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="../js/config.js"></script><script src="../js/auth.js"></script><script>let editId=null;function resetForm(){editId=null;form.reset();sort_order.value=10}
-async function load(){let r=await checkAdmin();if(!r.isAdmin){location.href="../login.html";return}let {data,error}=await supabaseClient.from("categories").select("*").order("sort_order");if(error){list.textContent=error.message;return}list.innerHTML=`<table><tr><th>Name</th><th>Slug</th><th>Action</th></tr>${(data||[]).map(c=>`<tr><td>${c.name}</td><td>${c.slug}</td><td><button onclick='edit(${JSON.stringify(c)})'>Edit</button> <button class="danger" onclick="del('${c.id}')">Delete</button></td></tr>`).join("")}</table>`}
-function edit(c){editId=c.id;name.value=c.name;slug.value=c.slug;sort_order.value=c.sort_order;scrollTo(0,0)}
-async function del(id){if(!confirm("Delete this category?"))return;let {error}=await supabaseClient.from("categories").delete().eq("id",id);if(error)alert(error.message);else load()}
-form.onsubmit=async e=>{e.preventDefault();let obj={name:name.value.trim(),slug:slug.value.trim(),sort_order:Number(sort_order.value)||10};let q=editId?supabaseClient.from("categories").update(obj).eq("id",editId):supabaseClient.from("categories").insert(obj);let {error}=await q;if(error)msg.textContent=error.message;else{msg.textContent="Saved.";resetForm();load()}};load();</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Categories | Muhafız Playz Admin</title>
+<link rel="stylesheet" href="admin.css?v=20261006">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Categories</h1>
+        <p class="sub">Organise your dramas into categories shown on the website.</p>
+      </div>
+      <button class="btn primary" id="newBtn" type="button">+ Add Category</button>
+    </div>
+
+    <div class="card hide" id="formCard">
+      <h2 id="formTitle">Add Category</h2>
+      <form id="form">
+        <div class="form-grid">
+          <div>
+            <label class="l" for="name">Name</label>
+            <input type="text" id="name" placeholder="e.g. Historical" required>
+          </div>
+          <div>
+            <label class="l" for="slug">Slug</label>
+            <input type="text" id="slug" placeholder="e.g. historical" required>
+          </div>
+          <div>
+            <label class="l" for="sort_order">Sort Order (small number shows first)</label>
+            <input type="number" id="sort_order" value="10">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn primary" type="submit" id="saveBtn">Save Category</button>
+          <button class="btn" type="button" id="cancelBtn">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap" id="list">Loading...</div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js?v=20261006"></script>
+<script src="../js/auth.js?v=20261006"></script>
+<script src="admin.js?v=20261006"></script>
+<script>
+var editId = null;
+var cats = [];
+var counts = {};
+var slugTouched = false;
+
+function $(id) { return document.getElementById(id); }
+
+function openForm(cat) {
+  editId = cat ? cat.id : null;
+  $("formTitle").textContent = cat ? "Edit Category" : "Add Category";
+  $("name").value = cat ? cat.name : "";
+  $("slug").value = cat ? cat.slug : "";
+  $("sort_order").value = cat && cat.sort_order != null ? cat.sort_order : 10;
+  slugTouched = !!cat;
+  $("formCard").classList.remove("hide");
+  $("name").focus();
+  window.scrollTo(0, 0);
+}
+
+function closeForm() {
+  editId = null;
+  $("form").reset();
+  $("sort_order").value = 10;
+  $("formCard").classList.add("hide");
+}
+
+function render() {
+  var box = $("list");
+  if (!cats.length) {
+    box.innerHTML = '<div class="empty-state">No categories yet. Click "Add Category".</div>';
+    return;
+  }
+  box.innerHTML = "<table><tr><th>Name</th><th>Slug</th><th>Order</th><th>Dramas</th><th>Actions</th></tr>" +
+    cats.map(function (c) {
+      var n = counts[c.name] || 0;
+      return "<tr><td class=\"t-title\">" + esc(c.name) + "</td><td>" + esc(c.slug) + "</td><td>" +
+        esc(c.sort_order) + "</td><td><span class=\"badge blue\">" + n + "</span></td>" +
+        "<td><div class=\"actions\"><button class=\"btn sm\" data-act=\"edit\" data-id=\"" + esc(c.id) + "\">Edit</button>" +
+        "<button class=\"btn sm danger\" data-act=\"del\" data-id=\"" + esc(c.id) + "\">Delete</button></div></td></tr>";
+    }).join("") + "</table>";
+}
+
+async function load() {
+  var res = await supabaseClient.from("categories").select("*").order("sort_order");
+  if (res.error) {
+    $("list").innerHTML = '<div class="empty-state">' + esc(res.error.message) + "</div>";
+    return;
+  }
+  cats = res.data || [];
+
+  counts = {};
+  var d = await supabaseClient.from("dramas").select("category");
+  if (!d.error && d.data) {
+    d.data.forEach(function (x) { counts[x.category] = (counts[x.category] || 0) + 1; });
+  }
+  render();
+}
+
+$("list").addEventListener("click", async function (e) {
+  var btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  var cat = cats.find(function (c) { return String(c.id) === btn.dataset.id; });
+  if (!cat) return;
+
+  if (btn.dataset.act === "edit") {
+    openForm(cat);
+  } else if (btn.dataset.act === "del") {
+    var n = counts[cat.name] || 0;
+    var warn = n ? "\n\nWarning: " + n + " drama(s) use this category." : "";
+    if (!confirm('Delete category "' + cat.name + '"?' + warn)) return;
+    var r = await supabaseClient.from("categories").delete().eq("id", cat.id);
+    if (r.error) toast(r.error.message, "err");
+    else { toast("Category deleted."); load(); }
+  }
+});
+
+$("newBtn").addEventListener("click", function () { openForm(null); });
+$("cancelBtn").addEventListener("click", closeForm);
+$("slug").addEventListener("input", function () { slugTouched = true; });
+$("name").addEventListener("input", function () {
+  if (!slugTouched) $("slug").value = slugify($("name").value);
+});
+
+$("form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  var obj = {
+    name: $("name").value.trim(),
+    slug: slugify($("slug").value),
+    sort_order: Number($("sort_order").value) || 10
+  };
+  if (!obj.name || !obj.slug) { toast("Name and slug are required.", "err"); return; }
+
+  $("saveBtn").disabled = true;
+  var q = editId
+    ? supabaseClient.from("categories").update(obj).eq("id", editId)
+    : supabaseClient.from("categories").insert(obj);
+  var r = await q;
+  $("saveBtn").disabled = false;
+
+  if (r.error) { toast(r.error.message, "err"); return; }
+  toast("Category saved.");
+  closeForm();
+  load();
+});
+
+(async function () {
+  var ok = await requireAdmin();
+  if (!ok) return;
+  renderNav("categories");
+  load();
+})();
+</script>
+</body>
+</html>
