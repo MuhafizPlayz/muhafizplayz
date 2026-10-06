@@ -1,127 +1,117 @@
-// Muhafız Playz — Authentication
+// Muhafız Playz — Admin authentication
+// Uses the existing global `supabaseClient` defined in js/config.js.
+// Does NOT depend on public.is_admin().
+
+async function getCurrentUser() {
+  const { data, error } = await supabaseClient.auth.getUser();
+  if (error || !data || !data.user) {
+    return null;
+  }
+  return data.user;
+}
+
+async function checkAdmin() {
+  const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+
+  if (userError || !userData || !userData.user) {
+    return { isAdmin: false, user: null, profile: null };
+  }
+
+  const user = userData.user;
+
+  const { data: profile, error: profileError } = await supabaseClient
+    .from("profiles")
+    .select("id,email,role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error("Profile lookup failed:", profileError.message);
+    return { isAdmin: false, user: user, profile: null, error: profileError.message };
+  }
+
+  if (profile && profile.role === "admin") {
+    return {
+      isAdmin: true,
+      user: user,
+      profile: profile
+    };
+  }
+
+  return {
+    isAdmin: false,
+    user: user,
+    profile: profile || null
+  };
+}
 
 async function loginUser(email, password) {
-    try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email: email.trim(),
-            password: password
-        });
+  // 1. Sign in with Supabase Auth
+  const { data: signInData, error: signInError } =
+    await supabaseClient.auth.signInWithPassword({ email: email, password: password });
 
-        if (error) {
-            throw error;
-        }
+  if (signInError) {
+    return { ok: false, error: signInError.message };
+  }
 
-        return {
-            success: true,
-            user: data.user,
-            session: data.session
-        };
+  // 2. Get current session
+  const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+  const session = sessionData ? sessionData.session : null;
 
-    } catch (error) {
-        console.error("Login error:", error);
+  if (sessionError || !session || !session.user) {
+    return { ok: false, error: "Login succeeded but no session was found. Please try again." };
+  }
 
-        return {
-            success: false,
-            error: error.message || "Login failed."
-        };
-    }
+  // 3. Get authenticated user's ID
+  const userId = session.user.id;
+
+  // 4. Query that user's own profile
+  const { data: profile, error: profileError } = await supabaseClient
+    .from("profiles")
+    .select("id,email,role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError) {
+    await supabaseClient.auth.signOut();
+    return { ok: false, error: "Could not read your profile: " + profileError.message };
+  }
+
+  if (!profile) {
+    await supabaseClient.auth.signOut();
+    return { ok: false, error: "No profile record was found for this account." };
+  }
+
+  // 5. Check role
+  if (profile.role !== "admin") {
+    await supabaseClient.auth.signOut();
+    return {
+      ok: false,
+      error: "You do not have administrator access. Your profile role is \"" + profile.role + "\"."
+    };
+  }
+
+  return { ok: true, user: session.user, profile: profile };
 }
 
-
-// Check whether the currently signed-in user is an admin
-async function checkAdmin() {
-    try {
-        const {
-            data: { user },
-            error: userError
-        } = await supabaseClient.auth.getUser();
-
-        if (userError || !user) {
-            return {
-                isAdmin: false,
-                user: null
-            };
-        }
-
-        const { data: profile, error: profileError } = await supabaseClient
-            .from("profiles")
-            .select("id, email, role")
-            .eq("id", user.id)
-            .single();
-
-        if (profileError || !profile || profile.role !== "admin") {
-            return {
-                isAdmin: false,
-                user: user,
-                profile: profile || null
-            };
-        }
-
-        return {
-            isAdmin: true,
-            user: user,
-            profile: profile
-        };
-
-    } catch (error) {
-        console.error("Admin check error:", error);
-
-        return {
-            isAdmin: false,
-            user: null
-        };
-    }
-}
-
-
-// Protect an admin page
 async function requireAdmin() {
-    const result = await checkAdmin();
+  const result = await checkAdmin();
 
-    if (!result.isAdmin) {
-        window.location.href = "../login.html";
-        return false;
-    }
+  if (!result.isAdmin) {
+    window.location.replace("../login.html");
+    return false;
+  }
 
-    return true;
+  return true;
 }
 
-
-// Logout
 async function logoutUser() {
-    try {
-        const { error } = await supabaseClient.auth.signOut();
-
-        if (error) {
-            throw error;
-        }
-
-        window.location.href = "../index.html";
-
-    } catch (error) {
-        console.error("Logout error:", error);
-        alert("Logout failed: " + error.message);
-    }
+  await supabaseClient.auth.signOut();
+  window.location.replace("../index.html");
 }
 
-
-// Get current logged-in user
-async function getCurrentUser() {
-    try {
-        const {
-            data: { user },
-            error
-        } = await supabaseClient.auth.getUser();
-
-        if (error) {
-            console.error("Get user error:", error);
-            return null;
-        }
-
-        return user;
-
-    } catch (error) {
-        console.error("Get user error:", error);
-        return null;
-    }
-          }
+window.loginUser = loginUser;
+window.checkAdmin = checkAdmin;
+window.requireAdmin = requireAdmin;
+window.logoutUser = logoutUser;
+window.getCurrentUser = getCurrentUser;
