@@ -39,8 +39,14 @@
             <input type="date" id="release_date">
           </div>
           <div class="full">
-            <label class="l" for="thumbnail_url">Thumbnail URL</label>
+            <label class="l" for="thumbnail_url">Thumbnail (URL ya upload)</label>
             <input type="text" id="thumbnail_url" placeholder="https://...">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
+              <button class="btn sm" type="button" id="thumb_btn">Upload from phone / gallery</button>
+              <input type="file" id="thumb_file" accept="image/*" style="display:none">
+              <span class="t-sub" id="thumb_status"></span>
+            </div>
+            <img id="thumb_preview" alt="" style="display:none;margin-top:10px;max-width:160px;max-height:160px;border-radius:8px;border:1px solid #2c2c44;object-fit:cover">
           </div>
           <div class="full">
             <label class="l" for="description">Description</label>
@@ -230,6 +236,74 @@ $("form").addEventListener("submit", async function (e) {
   closeForm();
   load();
 });
+
+
+/* ---------- Image upload (mobile gallery/camera -> Supabase Storage) ---------- */
+function compressImage(file, maxSide) {
+  return new Promise(function (resolve) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var w = img.naturalWidth, h = img.naturalHeight;
+      var scale = Math.min(1, maxSide / Math.max(w, h));
+      var c = document.createElement("canvas");
+      c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function (b) { resolve(b ? { blob: b, type: "image/jpeg", ext: "jpg" } : null); }, "image/jpeg", 0.85);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+async function uploadImage(file, folder) {
+  var packed = await compressImage(file, 1000);
+  var body, type, ext;
+  if (packed) { body = packed.blob; type = packed.type; ext = packed.ext; }
+  else {
+    body = file; type = file.type || "image/jpeg";
+    ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  }
+  var path = folder + "/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "." + ext;
+  var up = await supabaseClient.storage.from("posters").upload(path, body, { contentType: type, upsert: false });
+  if (up.error) throw up.error;
+  return supabaseClient.storage.from("posters").getPublicUrl(path).data.publicUrl;
+}
+
+function setupUpload(cfg) {
+  var input = $(cfg.urlId), file = $(cfg.fileId), btn = $(cfg.btnId), st = $(cfg.statusId), prev = $(cfg.previewId);
+  function preview() {
+    var v = input.value.trim();
+    if (v) { prev.src = v; prev.style.display = "block"; } else { prev.removeAttribute("src"); prev.style.display = "none"; }
+  }
+  prev.onerror = function () { prev.style.display = "none"; };
+  input.addEventListener("input", preview);
+  btn.addEventListener("click", function () { file.click(); });
+  file.addEventListener("change", async function () {
+    var f = file.files && file.files[0];
+    if (!f) return;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name)) { toast("Please choose an image file.", "err"); file.value = ""; return; }
+    btn.disabled = true; st.textContent = "Uploading...";
+    try {
+      input.value = await uploadImage(f, cfg.folder);
+      st.textContent = "Uploaded. Ab Save dabayein.";
+      toast("Image uploaded.");
+    } catch (err) {
+      st.textContent = "";
+      toast("Upload failed: " + (err.message || err), "err");
+    }
+    btn.disabled = false; file.value = ""; preview();
+  });
+  return preview;
+}
+
+var updateThumbPreview = setupUpload({ urlId: "thumbnail_url", fileId: "thumb_file", btnId: "thumb_btn", statusId: "thumb_status", previewId: "thumb_preview", folder: "episodes" });
+var _openForm = openForm, _closeForm = closeForm;
+openForm = function (ep) { _openForm(ep); $("thumb_status").textContent = ""; updateThumbPreview(); };
+closeForm = function () { _closeForm(); $("thumb_status").textContent = ""; updateThumbPreview(); };
+$("cancelBtn").removeEventListener("click", _closeForm);
+$("cancelBtn").addEventListener("click", function () { closeForm(); });
 
 (async function () {
   var ok = await requireAdmin();
