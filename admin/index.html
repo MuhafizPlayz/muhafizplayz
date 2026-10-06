@@ -2,169 +2,105 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin Dashboard | Muhafız Playz</title>
-
-<link rel="stylesheet" href="../css/style.css">
-
-<style>
-body {
-    background:#0e0e0f;
-    color:#fff;
-}
-
-.admin-wrap {
-    width:min(1100px, calc(100% - 30px));
-    margin:0 auto;
-    padding:30px 0 60px;
-}
-
-.admin-header {
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:15px;
-    margin-bottom:30px;
-}
-
-.admin-logo {
-    width:170px;
-    max-height:60px;
-    object-fit:contain;
-}
-
-.admin-header button {
-    border:0;
-    border-radius:8px;
-    padding:10px 16px;
-    cursor:pointer;
-    font-weight:700;
-}
-
-.welcome {
-    color:#aaa;
-    margin-bottom:25px;
-}
-
-.admin-grid {
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:18px;
-}
-
-.admin-card {
-    display:block;
-    text-decoration:none;
-    color:#fff;
-    background:#171719;
-    border:1px solid #29292c;
-    border-radius:14px;
-    padding:24px;
-    transition:.2s;
-}
-
-.admin-card:hover {
-    transform:translateY(-2px);
-    border-color:#555;
-}
-
-.admin-card h2 {
-    margin:0 0 8px;
-    font-size:20px;
-}
-
-.admin-card p {
-    margin:0;
-    color:#999;
-    line-height:1.5;
-}
-</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard | Muhafız Playz Admin</title>
+<link rel="stylesheet" href="admin.css?v=20261006">
 </head>
-
 <body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Dashboard</h1>
+        <p class="sub" id="welcome">Loading...</p>
+      </div>
+      <a class="btn primary" href="dramas.html">+ Add Drama</a>
+    </div>
 
-<main class="admin-wrap">
+    <div class="stats">
+      <div class="stat red"><div class="n" id="s-dramas">–</div><div class="l">Total Dramas</div></div>
+      <div class="stat green"><div class="n" id="s-published">–</div><div class="l">Published</div></div>
+      <div class="stat amber"><div class="n" id="s-draft">–</div><div class="l">Drafts</div></div>
+      <div class="stat blue"><div class="n" id="s-episodes">–</div><div class="l">Episodes</div></div>
+      <div class="stat blue"><div class="n" id="s-cats">–</div><div class="l">Categories</div></div>
+    </div>
 
-    <header class="admin-header">
-        <img
-            class="admin-logo"
-            src="../assets/logo/logo.png"
-            alt="Muhafız Playz"
-        >
+    <div class="card">
+      <h2>Quick Actions</h2>
+      <div class="quick">
+        <a href="dramas.html">🎬 Manage Dramas<small>Add, edit, delete</small></a>
+        <a href="episodes.html">📺 Manage Episodes<small>Links and qualities</small></a>
+        <a href="categories.html">🗂️ Categories<small>Organise dramas</small></a>
+        <a href="social.html">🔗 Social Links<small>YouTube, Facebook...</small></a>
+        <a href="settings.html">⚙️ Site Settings<small>General options</small></a>
+        <a href="contact.html">✉️ Contact<small>Contact details</small></a>
+      </div>
+    </div>
 
-        <button id="logout-btn" type="button">Logout</button>
-    </header>
-
-    <section>
-        <h1>Admin Dashboard</h1>
-        <p class="welcome" id="welcome">Checking administrator access...</p>
-    </section>
-
-    <section class="admin-grid">
-
-        <a class="admin-card" href="dramas.html">
-            <h2>🎬 Dramas</h2>
-            <p>Add, edit and manage dramas.</p>
-        </a>
-
-        <a class="admin-card" href="episodes.html">
-            <h2>📺 Episodes</h2>
-            <p>Manage episodes and download links.</p>
-        </a>
-
-        <a class="admin-card" href="categories.html">
-            <h2>📂 Categories</h2>
-            <p>Manage website categories.</p>
-        </a>
-
-        <a class="admin-card" href="social.html">
-            <h2>🔗 Social Links</h2>
-            <p>Manage Facebook, WhatsApp, Instagram and other links.</p>
-        </a>
-
-        <a class="admin-card" href="settings.html">
-            <h2>⚙️ Website Settings</h2>
-            <p>Manage site name, logo and SEO settings.</p>
-        </a>
-
-        <a class="admin-card" href="contact.html">
-            <h2>📞 Contact Settings</h2>
-            <p>Manage contact information.</p>
-        </a>
-
-    </section>
-
-</main>
+    <div class="card">
+      <h2>Recently Added Dramas</h2>
+      <div class="table-wrap" id="recent">Loading...</div>
+    </div>
+  </main>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../js/config.js"></script>
-<script src="../js/auth.js"></script>
-
+<script src="../js/config.js?v=20261006"></script>
+<script src="../js/auth.js?v=20261006"></script>
+<script src="admin.js?v=20261006"></script>
 <script>
 (async function () {
+  var ok = await requireAdmin();
+  if (!ok) return;
+  renderNav("index");
 
-    const result = await checkAdmin();
+  var user = await getCurrentUser();
+  document.getElementById("welcome").textContent = "Welcome back, " + (user && user.email ? user.email : "Admin");
 
-    if (!result.isAdmin) {
-        window.location.href = "../login.html";
-        return;
-    }
+  async function count(table, filter) {
+    var q = supabaseClient.from(table).select("id", { count: "exact", head: true });
+    if (filter) q = filter(q);
+    var res = await q;
+    return res.error ? "!" : (res.count || 0);
+  }
 
-    const welcome = document.getElementById("welcome");
+  var results = await Promise.all([
+    count("dramas"),
+    count("dramas", function (q) { return q.eq("published", true); }),
+    count("episodes"),
+    count("categories")
+  ]);
 
-    if (result.profile && result.profile.email) {
-        welcome.textContent =
-            "Welcome, " + result.profile.email + " — Administrator";
-    } else {
-        welcome.textContent = "Welcome — Administrator";
-    }
+  document.getElementById("s-dramas").textContent = results[0];
+  document.getElementById("s-published").textContent = results[1];
+  document.getElementById("s-draft").textContent =
+    (typeof results[0] === "number" && typeof results[1] === "number") ? results[0] - results[1] : "–";
+  document.getElementById("s-episodes").textContent = results[2];
+  document.getElementById("s-cats").textContent = results[3];
 
+  var res = await supabaseClient
+    .from("dramas")
+    .select("id,title,category,published,created_at")
+    .order("created_at", { ascending: false })
+    .limit(6);
+
+  var box = document.getElementById("recent");
+  if (res.error) {
+    box.innerHTML = '<div class="empty-state">' + esc(res.error.message) + "</div>";
+    return;
+  }
+  if (!res.data || !res.data.length) {
+    box.innerHTML = '<div class="empty-state">No dramas yet. Click "Add Drama" to start.</div>';
+    return;
+  }
+  box.innerHTML = "<table><tr><th>Title</th><th>Category</th><th>Status</th></tr>" +
+    res.data.map(function (d) {
+      return "<tr><td class=\"t-title\">" + esc(d.title) + "</td><td>" + esc(d.category || "-") +
+        "</td><td>" + (d.published ? '<span class="badge green">Published</span>' : '<span class="badge gray">Draft</span>') +
+        "</td></tr>";
+    }).join("") + "</table>";
 })();
-
-document.getElementById("logout-btn").addEventListener("click", async function () {
-    await logoutUser();
-});
 </script>
-
 </body>
-  </html>
+</html>
