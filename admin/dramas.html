@@ -1,10 +1,271 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dramas | Muhafız Playz</title><style>body{margin:0;background:#0e0e0f;color:#fff;font-family:Arial,sans-serif}.wrap{width:min(1100px,calc(100% - 30px));margin:auto;padding:25px 0 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:25px}.top a,.top button,.btn{padding:10px 14px;border:0;border-radius:8px;text-decoration:none;cursor:pointer}.panel{background:#171719;border:1px solid #29292c;border-radius:14px;padding:20px;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}input,textarea,select{width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #333;background:#101011;color:#fff;margin:6px 0 12px}label{display:block;color:#bbb;margin-top:8px}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #29292c;text-align:left}button.danger{background:#7a2020;color:#fff}.msg{color:#aaa;margin:8px 0}.hide{display:none}</style></head><body>
-<div class="wrap"><div class="top"><h1>Dramas</h1><div><a href="index.html">Dashboard</a> <button onclick="logoutUser()">Logout</button></div></div><div class="panel"><form id="form"><input type="hidden" id="id"><label>Title</label><input id="title" required><label>Slug</label><input id="slug" required><label>Urdu Title</label><input id="urdu_title"><label>Original Title</label><input id="original_title"><label>Poster URL</label><input id="poster_url"><label>Description</label><textarea id="description"></textarea><label>Genre</label><input id="genre"><label>Category</label><select id="category"></select><label>Year</label><input id="year" type="number"><label>Status</label><input id="status" value="Ongoing"><label><input id="published" type="checkbox"> Published</label><label><input id="featured" type="checkbox"> Featured</label><label><input id="coming_soon" type="checkbox"> Coming Soon</label><label><input id="previous_show" type="checkbox"> Previous Show</label><button class="btn" type="submit">Save Drama</button> <button class="btn" type="button" onclick="resetForm()">New</button><div class="msg" id="msg"></div></form></div><div class="panel"><div id="list">Loading...</div></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="../js/config.js"></script><script src="../js/auth.js"></script><script>let editId=null;
-async function loadCats(){let {data,error}=await supabaseClient.from("categories").select("name,slug").order("sort_order");if(error){msg.textContent=error.message;return}category.innerHTML=(data||[]).map(x=>`<option value="${x.name.replace(/"/g,"&quot;")}">${x.name}</option>`).join("")}
-function resetForm(){editId=null;form.reset();id.value=""}
-async function load(){let r=await checkAdmin();if(!r.isAdmin){location.href="../login.html";return}await loadCats();let {data,error}=await supabaseClient.from("dramas").select("*").order("sort_order").order("created_at",{ascending:false});if(error){list.textContent=error.message;return}list.innerHTML=`<table><tr><th>Title</th><th>Category</th><th>Published</th><th>Action</th></tr>${(data||[]).map(d=>`<tr><td>${d.title}</td><td>${d.category}</td><td>${d.published?"Yes":"No"}</td><td><button onclick='edit(${JSON.stringify(d)})'>Edit</button> <button class="danger" onclick="del('${d.id}')">Delete</button></td></tr>`).join("")}</table>`}
-function edit(d){editId=d.id;for(const k of ["title","slug","urdu_title","original_title","poster_url","description","genre","category","year","status"])if(document.getElementById(k))document.getElementById(k).value=d[k]??"";published.checked=!!d.published;featured.checked=!!d.featured;coming_soon.checked=!!d.coming_soon;previous_show.checked=!!d.previous_show;scrollTo(0,0)}
-async function del(id){if(!confirm("Delete this drama?"))return;let {error}=await supabaseClient.from("dramas").delete().eq("id",id);if(error)alert(error.message);else load()}
-form.onsubmit=async e=>{e.preventDefault();let obj={title:title.value.trim(),slug:slug.value.trim(),urdu_title:urdu_title.value.trim()||null,original_title:original_title.value.trim()||null,poster_url:poster_url.value.trim()||null,description:description.value.trim()||null,genre:genre.value.trim()||null,category:category.value,year:year.value?Number(year.value):null,status:status.value.trim()||"Ongoing",published:published.checked,featured:featured.checked,coming_soon:coming_soon.checked,previous_show:previous_show.checked};let q=editId?supabaseClient.from("dramas").update(obj).eq("id",editId):supabaseClient.from("dramas").insert(obj);let {error}=await q;if(error)msg.textContent=error.message;else{msg.textContent="Saved.";resetForm();load()}}
-load();</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dramas | Muhafız Playz Admin</title>
+<link rel="stylesheet" href="admin.css?v=20261006">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Dramas</h1>
+        <p class="sub" id="count">Loading...</p>
+      </div>
+      <button class="btn primary" id="newBtn" type="button">+ Add Drama</button>
+    </div>
+
+    <div class="card hide" id="formCard">
+      <h2 id="formTitle">Add Drama</h2>
+      <form id="form">
+        <div class="form-grid">
+          <div>
+            <label class="l" for="title">Title</label>
+            <input type="text" id="title" required>
+          </div>
+          <div>
+            <label class="l" for="slug">Slug</label>
+            <input type="text" id="slug" required>
+          </div>
+          <div>
+            <label class="l" for="urdu_title">Urdu Title</label>
+            <input type="text" id="urdu_title">
+          </div>
+          <div>
+            <label class="l" for="original_title">Original Title</label>
+            <input type="text" id="original_title">
+          </div>
+          <div>
+            <label class="l" for="category">Category</label>
+            <select id="category"></select>
+          </div>
+          <div>
+            <label class="l" for="genre">Genre</label>
+            <input type="text" id="genre" placeholder="e.g. Action, Historical">
+          </div>
+          <div>
+            <label class="l" for="year">Year</label>
+            <input type="number" id="year">
+          </div>
+          <div>
+            <label class="l" for="status">Status</label>
+            <input type="text" id="status" value="Ongoing">
+          </div>
+          <div class="full">
+            <label class="l" for="poster_url">Poster URL</label>
+            <input type="text" id="poster_url" placeholder="https://...">
+          </div>
+          <div class="full">
+            <label class="l" for="description">Description</label>
+            <textarea id="description"></textarea>
+          </div>
+        </div>
+
+        <div class="checks">
+          <label><input type="checkbox" id="published"> Published</label>
+          <label><input type="checkbox" id="featured"> Featured</label>
+          <label><input type="checkbox" id="coming_soon"> Coming Soon</label>
+          <label><input type="checkbox" id="previous_show"> Previous Show</label>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn primary" type="submit" id="saveBtn">Save Drama</button>
+          <button class="btn" type="button" id="cancelBtn">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Search by title...">
+        <select id="filterCat"><option value="">All categories</option></select>
+        <select id="filterStatus">
+          <option value="">All status</option>
+          <option value="pub">Published</option>
+          <option value="draft">Draft</option>
+        </select>
+      </div>
+      <div class="table-wrap" id="list">Loading...</div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js?v=20261006"></script>
+<script src="../js/auth.js?v=20261006"></script>
+<script src="admin.js?v=20261006"></script>
+<script>
+var editId = null;
+var dramas = [];
+var cats = [];
+var slugTouched = false;
+var TEXT_FIELDS = ["title", "slug", "urdu_title", "original_title", "poster_url", "description", "genre", "year", "status"];
+var FLAGS = ["published", "featured", "coming_soon", "previous_show"];
+
+function $(id) { return document.getElementById(id); }
+
+function openForm(d) {
+  editId = d ? d.id : null;
+  $("formTitle").textContent = d ? "Edit Drama" : "Add Drama";
+  $("form").reset();
+  $("status").value = "Ongoing";
+  if (d) {
+    TEXT_FIELDS.forEach(function (k) { $(k).value = d[k] == null ? "" : d[k]; });
+    if (d.category && !Array.prototype.some.call($("category").options, function (o) { return o.value === d.category; })) {
+      var opt = document.createElement("option");
+      opt.value = d.category; opt.textContent = d.category;
+      $("category").appendChild(opt);
+    }
+    $("category").value = d.category || "";
+    FLAGS.forEach(function (k) { $(k).checked = !!d[k]; });
+  }
+  slugTouched = !!d;
+  $("formCard").classList.remove("hide");
+  $("title").focus();
+  window.scrollTo(0, 0);
+}
+
+function closeForm() {
+  editId = null;
+  $("form").reset();
+  $("formCard").classList.add("hide");
+}
+
+function render() {
+  var term = $("search").value.trim().toLowerCase();
+  var cat = $("filterCat").value;
+  var st = $("filterStatus").value;
+
+  var rows = dramas.filter(function (d) {
+    if (term && (String(d.title || "") + " " + String(d.urdu_title || "")).toLowerCase().indexOf(term) === -1) return false;
+    if (cat && d.category !== cat) return false;
+    if (st === "pub" && !d.published) return false;
+    if (st === "draft" && d.published) return false;
+    return true;
+  });
+
+  $("count").textContent = dramas.length + " total, showing " + rows.length;
+
+  var box = $("list");
+  if (!rows.length) {
+    box.innerHTML = '<div class="empty-state">No dramas found.</div>';
+    return;
+  }
+
+  box.innerHTML = "<table><tr><th></th><th>Title</th><th>Category</th><th>Year</th><th>Status</th><th>Actions</th></tr>" +
+    rows.map(function (d) {
+      var thumb = d.poster_url
+        ? '<img class="thumb" src="' + esc(d.poster_url) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+        : '<div class="thumb empty">No img</div>';
+      var badges = (d.published ? '<span class="badge green">Published</span>' : '<span class="badge gray">Draft</span>') +
+        (d.featured ? ' <span class="badge amber">Featured</span>' : "") +
+        (d.coming_soon ? ' <span class="badge blue">Coming Soon</span>' : "") +
+        (d.previous_show ? ' <span class="badge gray">Previous</span>' : "");
+      var id = esc(d.id);
+      return "<tr><td>" + thumb + "</td>" +
+        "<td><div class=\"t-title\">" + esc(d.title) + "</div><div class=\"t-sub\">" + esc(d.urdu_title || d.slug || "") + "</div></td>" +
+        "<td>" + esc(d.category || "-") + "</td><td>" + esc(d.year || "-") + "</td><td>" + badges + "</td>" +
+        "<td><div class=\"actions\">" +
+        "<button class=\"btn sm\" data-act=\"edit\" data-id=\"" + id + "\">Edit</button>" +
+        "<button class=\"btn sm\" data-act=\"toggle\" data-id=\"" + id + "\">" + (d.published ? "Unpublish" : "Publish") + "</button>" +
+        "<button class=\"btn sm danger\" data-act=\"del\" data-id=\"" + id + "\">Delete</button>" +
+        "</div></td></tr>";
+    }).join("") + "</table>";
+}
+
+async function loadCats() {
+  var res = await supabaseClient.from("categories").select("name,slug").order("sort_order");
+  if (res.error) { toast(res.error.message, "err"); return; }
+  cats = res.data || [];
+  var opts = cats.map(function (c) { return '<option value="' + esc(c.name) + '">' + esc(c.name) + "</option>"; }).join("");
+  $("category").innerHTML = opts;
+  $("filterCat").innerHTML = '<option value="">All categories</option>' + opts;
+}
+
+async function load() {
+  var res = await supabaseClient.from("dramas").select("*").order("created_at", { ascending: false });
+  if (res.error) {
+    $("list").innerHTML = '<div class="empty-state">' + esc(res.error.message) + "</div>";
+    $("count").textContent = "Error";
+    return;
+  }
+  dramas = res.data || [];
+  render();
+}
+
+$("list").addEventListener("click", async function (e) {
+  var btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  var d = dramas.find(function (x) { return String(x.id) === btn.dataset.id; });
+  if (!d) return;
+
+  if (btn.dataset.act === "edit") {
+    openForm(d);
+  } else if (btn.dataset.act === "toggle") {
+    var r = await supabaseClient.from("dramas").update({ published: !d.published }).eq("id", d.id);
+    if (r.error) toast(r.error.message, "err");
+    else { toast(d.published ? "Drama unpublished." : "Drama published."); load(); }
+  } else if (btn.dataset.act === "del") {
+    if (!confirm('Delete "' + d.title + '"? This cannot be undone.')) return;
+    var r2 = await supabaseClient.from("dramas").delete().eq("id", d.id);
+    if (r2.error) toast(r2.error.message, "err");
+    else { toast("Drama deleted."); load(); }
+  }
+});
+
+$("newBtn").addEventListener("click", function () { openForm(null); });
+$("cancelBtn").addEventListener("click", closeForm);
+$("search").addEventListener("input", render);
+$("filterCat").addEventListener("change", render);
+$("filterStatus").addEventListener("change", render);
+$("slug").addEventListener("input", function () { slugTouched = true; });
+$("title").addEventListener("input", function () {
+  if (!slugTouched) $("slug").value = slugify($("title").value);
+});
+
+$("form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  var obj = {
+    title: $("title").value.trim(),
+    slug: slugify($("slug").value),
+    urdu_title: $("urdu_title").value.trim() || null,
+    original_title: $("original_title").value.trim() || null,
+    poster_url: $("poster_url").value.trim() || null,
+    description: $("description").value.trim() || null,
+    genre: $("genre").value.trim() || null,
+    category: $("category").value || null,
+    year: $("year").value ? Number($("year").value) : null,
+    status: $("status").value.trim() || "Ongoing",
+    published: $("published").checked,
+    featured: $("featured").checked,
+    coming_soon: $("coming_soon").checked,
+    previous_show: $("previous_show").checked
+  };
+  if (!obj.title || !obj.slug) { toast("Title and slug are required.", "err"); return; }
+
+  $("saveBtn").disabled = true;
+  var q = editId
+    ? supabaseClient.from("dramas").update(obj).eq("id", editId)
+    : supabaseClient.from("dramas").insert(obj);
+  var r = await q;
+  $("saveBtn").disabled = false;
+
+  if (r.error) { toast(r.error.message, "err"); return; }
+  toast("Drama saved.");
+  closeForm();
+  load();
+});
+
+(async function () {
+  var ok = await requireAdmin();
+  if (!ok) return;
+  renderNav("dramas");
+  await loadCats();
+  load();
+})();
+</script>
+</body>
+</html>
