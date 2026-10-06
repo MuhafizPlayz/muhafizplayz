@@ -1,4 +1,89 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Website Settings | Muhafız Playz</title><style>body{margin:0;background:#0e0e0f;color:#fff;font-family:Arial,sans-serif}.wrap{width:min(1100px,calc(100% - 30px));margin:auto;padding:25px 0 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:25px}.top a,.top button,.btn{padding:10px 14px;border:0;border-radius:8px;text-decoration:none;cursor:pointer}.panel{background:#171719;border:1px solid #29292c;border-radius:14px;padding:20px;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}input,textarea,select{width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #333;background:#101011;color:#fff;margin:6px 0 12px}label{display:block;color:#bbb;margin-top:8px}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #29292c;text-align:left}button.danger{background:#7a2020;color:#fff}.msg{color:#aaa;margin:8px 0}.hide{display:none}</style></head><body>
-<div class="wrap"><div class="top"><h1>Website Settings</h1><div><a href="index.html">Dashboard</a> <button onclick="logoutUser()">Logout</button></div></div><div class="panel"><form id="form"><label>Site Name</label><input id="site_name"><label>Logo URL</label><input id="logo_url"><label>Description</label><textarea id="description"></textarea><label>Footer Text</label><input id="footer_text"><label>SEO Title</label><input id="seo_title"><label>SEO Description</label><textarea id="seo_description"></textarea><label>OG Image URL</label><input id="og_image_url"><label>Site URL</label><input id="site_url"><button class="btn">Save Website Settings</button><div id="msg" class="msg"></div></form></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="../js/config.js"></script><script src="../js/auth.js"></script><script>async function load(){let r=await checkAdmin();if(!r.isAdmin){location.href="../login.html";return}let {data,error}=await supabaseClient.from("site_settings").select("*").limit(1).maybeSingle();if(error){msg.textContent=error.message;return}if(data)for(const k of ["site_name","logo_url","description","footer_text","seo_title","seo_description","og_image_url","site_url"])document.getElementById(k).value=data[k]||""}
-form.onsubmit=async e=>{e.preventDefault();let {data:old}=await supabaseClient.from("site_settings").select("id").limit(1).maybeSingle();let obj={site_name:site_name.value.trim(),logo_url:logo_url.value.trim()||null,description:description.value.trim()||null,footer_text:footer_text.value.trim()||null,seo_title:seo_title.value.trim()||null,seo_description:seo_description.value.trim()||null,og_image_url:og_image_url.value.trim()||null,site_url:site_url.value.trim()||null};let q=old?supabaseClient.from("site_settings").update(obj).eq("id",old.id):supabaseClient.from("site_settings").insert(obj);let {error}=await q;msg.textContent=error?error.message:"Saved."};load();</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Website Settings | Muhafız Playz Admin</title>
+<link rel="stylesheet" href="admin.css?v=20261006">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Website Settings</h1>
+        <p class="sub">General information and SEO settings for your website.</p>
+      </div>
+    </div>
+
+    <form id="form">
+      <div class="card">
+        <h2>General</h2>
+        <div class="form-grid">
+          <div><label class="l" for="site_name">Site Name</label><input type="text" id="site_name"></div>
+          <div><label class="l" for="site_url">Site URL</label><input type="url" id="site_url" placeholder="https://..."></div>
+          <div class="full"><label class="l" for="logo_url">Logo URL</label><input type="text" id="logo_url"></div>
+          <div class="full"><label class="l" for="description">Description</label><textarea id="description"></textarea></div>
+          <div class="full"><label class="l" for="footer_text">Footer Text</label><input type="text" id="footer_text"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>SEO</h2>
+        <div class="form-grid">
+          <div class="full"><label class="l" for="seo_title">SEO Title</label><input type="text" id="seo_title"></div>
+          <div class="full"><label class="l" for="seo_description">SEO Description</label><textarea id="seo_description"></textarea></div>
+          <div class="full"><label class="l" for="og_image_url">OG Image URL</label><input type="text" id="og_image_url"></div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn primary" type="submit" id="saveBtn">Save Website Settings</button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js?v=20261006"></script>
+<script src="../js/auth.js?v=20261006"></script>
+<script src="admin.js?v=20261006"></script>
+<script>
+var FIELDS = ["site_name", "logo_url", "description", "footer_text", "seo_title", "seo_description", "og_image_url", "site_url"];
+function $(id) { return document.getElementById(id); }
+
+async function load() {
+  var res = await supabaseClient.from("site_settings").select("*").limit(1).maybeSingle();
+  if (res.error) { toast(res.error.message, "err"); return; }
+  if (res.data) FIELDS.forEach(function (k) { $(k).value = res.data[k] || ""; });
+}
+
+$("form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  $("saveBtn").disabled = true;
+
+  var old = await supabaseClient.from("site_settings").select("id").limit(1).maybeSingle();
+  var obj = {};
+  FIELDS.forEach(function (k) { obj[k] = $(k).value.trim() || null; });
+  obj.site_name = $("site_name").value.trim();
+
+  var q = old.data
+    ? supabaseClient.from("site_settings").update(obj).eq("id", old.data.id)
+    : supabaseClient.from("site_settings").insert(obj);
+  var r = await q;
+
+  $("saveBtn").disabled = false;
+  if (r.error) toast(r.error.message, "err");
+  else toast("Website settings saved.");
+});
+
+(async function () {
+  var ok = await requireAdmin();
+  if (!ok) return;
+  renderNav("settings");
+  load();
+})();
+</script>
+</body>
+</html>
