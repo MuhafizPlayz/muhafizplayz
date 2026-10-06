@@ -1,4 +1,78 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Social Links | Muhafız Playz</title><style>body{margin:0;background:#0e0e0f;color:#fff;font-family:Arial,sans-serif}.wrap{width:min(1100px,calc(100% - 30px));margin:auto;padding:25px 0 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:25px}.top a,.top button,.btn{padding:10px 14px;border:0;border-radius:8px;text-decoration:none;cursor:pointer}.panel{background:#171719;border:1px solid #29292c;border-radius:14px;padding:20px;margin-bottom:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}input,textarea,select{width:100%;box-sizing:border-box;padding:11px;border-radius:8px;border:1px solid #333;background:#101011;color:#fff;margin:6px 0 12px}label{display:block;color:#bbb;margin-top:8px}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #29292c;text-align:left}button.danger{background:#7a2020;color:#fff}.msg{color:#aaa;margin:8px 0}.hide{display:none}</style></head><body>
-<div class="wrap"><div class="top"><h1>Social Links</h1><div><a href="index.html">Dashboard</a> <button onclick="logoutUser()">Logout</button></div></div><div class="panel"><form id="form"><label>Facebook URL</label><input id="facebook_url"><label>WhatsApp URL</label><input id="whatsapp_url"><label>Instagram URL</label><input id="instagram_url"><label>TikTok URL</label><input id="tiktok_url"><label>Telegram URL</label><input id="telegram_url"><label>YouTube URL</label><input id="youtube_url"><button class="btn">Save Social Links</button><div id="msg" class="msg"></div></form></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="../js/config.js"></script><script src="../js/auth.js"></script><script>async function load(){let r=await checkAdmin();if(!r.isAdmin){location.href="../login.html";return}let {data,error}=await supabaseClient.from("social_links").select("*").limit(1).maybeSingle();if(error){msg.textContent=error.message;return}if(data)for(const k of ["facebook_url","whatsapp_url","instagram_url","tiktok_url","telegram_url","youtube_url"])document.getElementById(k).value=data[k]||""}
-form.onsubmit=async e=>{e.preventDefault();let {data:old}=await supabaseClient.from("social_links").select("id").limit(1).maybeSingle();let obj={facebook_url:facebook_url.value.trim()||null,whatsapp_url:whatsapp_url.value.trim()||null,instagram_url:instagram_url.value.trim()||null,tiktok_url:tiktok_url.value.trim()||null,telegram_url:telegram_url.value.trim()||null,youtube_url:youtube_url.value.trim()||null};let q=old?supabaseClient.from("social_links").update(obj).eq("id",old.id):supabaseClient.from("social_links").insert(obj);let {error}=await q;msg.textContent=error?error.message:"Saved."};load();</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Social Links | Muhafız Playz Admin</title>
+<link rel="stylesheet" href="admin.css?v=20261006">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Social Links</h1>
+        <p class="sub">Links shown in your website footer. Leave blank to hide a link.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <form id="form">
+        <div class="form-grid">
+          <div><label class="l" for="facebook_url">Facebook URL</label><input type="url" id="facebook_url" placeholder="https://facebook.com/..."></div>
+          <div><label class="l" for="whatsapp_url">WhatsApp URL</label><input type="url" id="whatsapp_url" placeholder="https://whatsapp.com/channel/..."></div>
+          <div><label class="l" for="instagram_url">Instagram URL</label><input type="url" id="instagram_url" placeholder="https://instagram.com/..."></div>
+          <div><label class="l" for="tiktok_url">TikTok URL</label><input type="url" id="tiktok_url" placeholder="https://tiktok.com/@..."></div>
+          <div><label class="l" for="telegram_url">Telegram URL</label><input type="url" id="telegram_url" placeholder="https://t.me/..."></div>
+          <div><label class="l" for="youtube_url">YouTube URL</label><input type="url" id="youtube_url" placeholder="https://youtube.com/@..."></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn primary" type="submit" id="saveBtn">Save Social Links</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js?v=20261006"></script>
+<script src="../js/auth.js?v=20261006"></script>
+<script src="admin.js?v=20261006"></script>
+<script>
+var FIELDS = ["facebook_url", "whatsapp_url", "instagram_url", "tiktok_url", "telegram_url", "youtube_url"];
+function $(id) { return document.getElementById(id); }
+
+async function load() {
+  var res = await supabaseClient.from("social_links").select("*").limit(1).maybeSingle();
+  if (res.error) { toast(res.error.message, "err"); return; }
+  if (res.data) FIELDS.forEach(function (k) { $(k).value = res.data[k] || ""; });
+}
+
+$("form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  $("saveBtn").disabled = true;
+
+  var old = await supabaseClient.from("social_links").select("id").limit(1).maybeSingle();
+  var obj = {};
+  FIELDS.forEach(function (k) { obj[k] = $(k).value.trim() || null; });
+
+  var q = old.data
+    ? supabaseClient.from("social_links").update(obj).eq("id", old.data.id)
+    : supabaseClient.from("social_links").insert(obj);
+  var r = await q;
+
+  $("saveBtn").disabled = false;
+  if (r.error) toast(r.error.message, "err");
+  else toast("Social links saved.");
+});
+
+(async function () {
+  var ok = await requireAdmin();
+  if (!ok) return;
+  renderNav("social");
+  load();
+})();
+</script>
+</body>
+</html>
