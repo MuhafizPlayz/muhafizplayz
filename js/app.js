@@ -1,5 +1,5 @@
 /* Muhafız Playz — shared code: header, footer, and page rendering.
-   You normally do NOT need to edit this file. Edit js/data.js instead. */
+   You normally do NOT need to edit this file. Data comes from Supabase via js/data.js (loadData). */
 (function () {
   "use strict";
   var ROOT = document.body.dataset.root || "";   // "" on main pages, "../" inside /pages/
@@ -47,19 +47,21 @@
   var ICON_SEARCH = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
   var ICON_MENU = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
 
-  function renderHeader() {
+  function navHtml() {
     var cat = params.get("category");
-    var items = [
-      ["Home", ROOT + "index.html", PAGE === "home" && !cat],
-      ["Turkish Dramas", ROOT + "index.html?category=turkish-dramas", cat === "turkish-dramas"],
-      ["Movies", ROOT + "index.html?category=movies", cat === "movies"],
-      ["Urdu Dubbed", ROOT + "index.html?category=urdu-dubbed", cat === "urdu-dubbed"],
-      ["About", ROOT + "about.html", /about\.html$/.test(location.pathname)],
-      ["Contact", ROOT + "contact.html", /contact\.html$/.test(location.pathname)]
-    ];
-    var nav = items.map(function (i) {
-      return '<a href="' + i[1] + '"' + (i[2] ? ' aria-current="page"' : "") + ">" + i[0] + "</a>";
+    var items = [["Home", ROOT + "index.html", PAGE === "home" && !cat]];
+    CATEGORIES.forEach(function (c) {
+      items.push([c.name, ROOT + "index.html?category=" + encodeURIComponent(c.id), cat === c.id]);
+    });
+    items.push(["About", ROOT + "about.html", /about\.html$/.test(location.pathname)]);
+    items.push(["Contact", ROOT + "contact.html", /contact\.html$/.test(location.pathname)]);
+    return items.map(function (i) {
+      return '<a href="' + i[1] + '"' + (i[2] ? ' aria-current="page"' : "") + ">" + esc(i[0]) + "</a>";
     }).join("");
+  }
+
+  function renderHeader() {
+    var nav = navHtml();
     var h = document.createElement("header");
     h.className = "site-header";
     h.innerHTML =
@@ -97,21 +99,25 @@
   }
 
   function renderFooter() {
+    var old = $(".site-footer");
+    if (old) old.remove();
     var so = SITE.social;
-    var social = [["Facebook", so.facebook], ["WhatsApp Channel", so.whatsapp], ["Instagram", so.instagram], ["TikTok", so.tiktok], ["Telegram", so.telegram]]
+    var social = [["Facebook", so.facebook], ["WhatsApp Channel", so.whatsapp], ["Instagram", so.instagram], ["TikTok", so.tiktok], ["Telegram", so.telegram], ["YouTube", so.youtube]]
+      .filter(function (x) { return x[1] && x[1] !== "#"; })
       .map(function (x) {
         return '<li><a href="' + esc(x[1]) + '" target="_blank" rel="noopener noreferrer">' + x[0] + "</a></li>";
       }).join("");
+    var about = SITE.footerText ? esc(SITE.footerText) : esc(SITE.tagline) + ". Download links are shared only for content we have permission to distribute.";
     var f = document.createElement("footer");
     f.className = "site-footer";
     f.innerHTML =
       '<div class="wrap"><div class="foot-grid">' +
-      "<div><h2>Muhafız Playz</h2><p>" + esc(SITE.tagline) + ". Download links are shared only for content we have permission to distribute.</p></div>" +
+      "<div><h2>" + esc(SITE.name) + "</h2><p>" + about + "</p></div>" +
       '<div><h2>Explore</h2><ul><li><a href="' + ROOT + 'index.html">Home</a></li>' +
       '<li><a href="' + ROOT + 'about.html">About</a></li><li><a href="' + ROOT + 'contact.html">Contact</a></li>' +
       '<li><a href="' + ROOT + 'privacy-policy.html">Privacy Policy</a></li><li><a href="' + ROOT + 'terms.html">Terms</a></li></ul></div>' +
-      "<div><h2>Follow us</h2><ul>" + social + "</ul></div></div>" +
-      '<p class="copy">&copy; ' + new Date().getFullYear() + " Muhafız Playz. All rights reserved.</p></div>";
+      (social ? "<div><h2>Follow us</h2><ul>" + social + "</ul></div>" : "") + "</div>" +
+      '<p class="copy">&copy; ' + new Date().getFullYear() + " " + esc(SITE.name) + ". All rights reserved.</p></div>";
     document.body.appendChild(f);
   }
 
@@ -131,7 +137,7 @@
     var cat = params.get("category");
     var chips = '<a class="chip' + (!cat ? " active" : "") + '" href="' + ROOT + 'index.html">All</a>' +
       CATEGORIES.map(function (c) {
-        return '<a class="chip' + (cat === c.id ? " active" : "") + '" href="' + ROOT + "index.html?category=" + c.id + '">' + esc(c.name) + "</a>";
+        return '<a class="chip' + (cat === c.id ? " active" : "") + '" href="' + ROOT + "index.html?category=" + encodeURIComponent(c.id) + '">' + esc(c.name) + "</a>";
       }).join("");
     $("#chips").innerHTML = chips;
 
@@ -141,19 +147,36 @@
         '<a class="hero-feature" href="' + dramaUrl(feat) + '" aria-label="Open ' + esc(feat.title) + '">' +
         '<img src="' + posterUrl(feat) + '" alt="' + esc(feat.title) + ' poster" width="400" height="300">' +
         '<div class="cap"><span>Featured</span><strong>' + esc(feat.title) + "</strong></div></a>";
+    } else {
+      $("#hero-feature").innerHTML = "";
     }
 
-    var list = DRAMAS, title = "Turkish Dramas &amp; Movies";
+    if (DATA_ERROR && !DRAMAS.length) {
+      $("#grid").innerHTML = '<p class="empty">Could not load content right now. Please refresh in a moment.</p>';
+      $("#latest-section").hidden = true; $("#popular-section").hidden = true;
+      return;
+    }
+
+    var list, title = "Turkish Dramas &amp; Movies";
     if (cat) {
       list = DRAMAS.filter(function (d) { return d.categories.indexOf(cat) > -1; });
       title = esc(catName(cat));
-      document.title = catName(cat) + " | Muhafız Playz";
+      document.title = catName(cat) + " | " + SITE.name;
       $("#hero").hidden = true;
+    } else {
+      list = DRAMAS.filter(function (d) { return !d.previousShow; });
+      if (SITE.seoTitle) document.title = SITE.seoTitle;
+      var md = $('meta[name="description"]');
+      if (md && SITE.seoDescription) md.setAttribute("content", SITE.seoDescription);
     }
     $("#grid-title").innerHTML = title;
     $("#grid").innerHTML = cards(list);
 
-    if (cat) { $("#latest-section").hidden = true; $("#popular-section").hidden = true; return; }
+    if (cat) {
+      $("#latest-section").hidden = true; $("#popular-section").hidden = true;
+      var ps0 = $("#previous-section"); if (ps0) ps0.hidden = true;
+      return;
+    }
 
     var eps = [];
     DRAMAS.forEach(function (d) {
@@ -166,7 +189,16 @@
         "<strong>" + esc(x.d.title) + "</strong><span>Episode " + x.e.number + "</span></div></a>";
     }).join("") || '<p class="empty">No episodes yet.</p>';
 
-    $("#popular").innerHTML = cards(DRAMAS.filter(function (d) { return d.popular; }));
+    var pop = DRAMAS.filter(function (d) { return d.popular; });
+    $("#popular").innerHTML = cards(pop);
+    $("#popular-section").hidden = !pop.length;
+
+    var prev = DRAMAS.filter(function (d) { return d.previousShow; });
+    var ps = $("#previous-section");
+    if (ps) {
+      ps.hidden = !prev.length;
+      $("#previous").innerHTML = cards(prev);
+    }
   }
 
   /* ---------- DRAMA DETAIL ---------- */
@@ -246,11 +278,24 @@
   /* ---------- start ---------- */
   renderHeader();
   renderFooter();
-  if (PAGE === "home") renderHome();
-  else if (PAGE === "drama") renderDrama();
-  else if (PAGE === "episode") renderEpisode();
-  else if (PAGE === "download") renderDownload();
 
   // shared with search.js
   window.MP = { posterUrl: posterUrl, dramaUrl: dramaUrl, catLabel: catLabel, esc: esc };
+
+  // loading placeholder while Supabase data arrives
+  if (PAGE === "home") { $("#grid").innerHTML = '<p class="empty">Loading...</p>'; }
+  else if (PAGE !== "static" && $("#content")) { $("#content").innerHTML = '<div class="wrap"><p class="empty" style="padding:30px 0">Loading...</p></div>'; }
+
+  function start() {
+    var navEl = $("#main-nav");
+    if (navEl) navEl.innerHTML = navHtml();
+    renderFooter();
+    if (PAGE === "home") renderHome();
+    else if (PAGE === "drama") renderDrama();
+    else if (PAGE === "episode") renderEpisode();
+    else if (PAGE === "download") renderDownload();
+    document.dispatchEvent(new Event("mp:data"));
+  }
+
+  loadData().then(start, start);
 })();
