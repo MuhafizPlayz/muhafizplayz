@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Login | Muhafız Playz</title>
+<link rel="stylesheet" href="css/style.css">
+
+<style>
+body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0e0e0f;
+}
+
+.login-box {
+    width: min(420px, calc(100% - 32px));
+    background: #171719;
+    border: 1px solid #29292c;
+    border-radius: 16px;
+    padding: 30px;
+    box-sizing: border-box;
+}
+
+.login-logo {
+    display: block;
+    max-width: 190px;
+    max-height: 70px;
+    margin: 0 auto 24px;
+    object-fit: contain;
+}
+
+.login-box h1 {
+    text-align: center;
+    margin: 0 0 8px;
+}
+
+.login-box p {
+    text-align: center;
+    color: #aaa;
+    margin-bottom: 24px;
+}
+
+.login-box label {
+    display: block;
+    margin: 14px 0 7px;
+}
+
+.login-box input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 13px;
+    border-radius: 9px;
+    border: 1px solid #333;
+    background: #101011;
+    color: #fff;
+    outline: none;
+}
+
+.login-box button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 13px;
+    border: 0;
+    border-radius: 9px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+#error {
+    color: #ff7070;
+    margin-top: 15px;
+    text-align: center;
+    display: none;
+}
+</style>
+</head>
+
+<body>
+
+<main class="login-box">
+
+    <img
+        class="login-logo"
+        src="assets/logo/logo.png"
+        alt="Muhafız Playz"
+    >
+
+    <h1>Admin Login</h1>
+    <p>Muhafız Playz Official</p>
+
+    <form id="login-form">
+
+        <label for="email">Email</label>
+        <input
+            id="email"
+            type="email"
+            autocomplete="email"
+            required
+        >
+
+        <label for="password">Password</label>
+        <input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            required
+        >
+
+        <button type="submit">Login</button>
+
+        <div id="error"></div>
+
+    </form>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+
+<script>
+document.getElementById("login-form").addEventListener("submit", async function(event) {
+    event.preventDefault();
+
+    const errorBox = document.getElementById("error");
+    const button = this.querySelector("button");
+
+    errorBox.style.display = "none";
+    button.disabled = true;
+    button.textContent = "Logging in...";
+
+    const result = await loginUser(
+        document.getElementById("email").value,
+        document.getElementById("password").value
+    );
+
+    if (!result.success) {
+        errorBox.textContent = result.error;
+        errorBox.style.display = "block";
+        button.disabled = false;
+        button.textContent = "Login";
+        return;
+    }
+
+    const admin = await checkAdmin();
+
+    if (!admin.isAdmin) {
+        await supabaseClient.auth.signOut();
+
+        errorBox.textContent = "You do not have administrator access.";
+        errorBox.style.display = "block";
+        button.disabled = false;
+        button.textContent = "Login";
+        return;
+    }
+
+    window.location.href = "admin/index.html";
+});
+</script>
+
+</body>
+</html>
